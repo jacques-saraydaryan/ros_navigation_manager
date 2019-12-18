@@ -68,7 +68,7 @@ inflation_layer:
 inflation_layer_local:
   enabled:              true
   cost_scaling_factor:  1.5  # exponential rate at which the obstacle cost drops off (default: 10) 5.0
-  inflation_radius:     0.30  # max. distance from an obstacle at which costs are incurred for planning paths. 0.12
+  inflation_radius:     0.25  # max. distance from an obstacle at which costs are incurred for planning paths. 0.12
 
 static_layer:
   enabled:              true #true

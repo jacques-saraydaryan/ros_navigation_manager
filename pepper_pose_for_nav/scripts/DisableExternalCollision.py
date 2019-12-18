@@ -25,7 +25,9 @@ class DisableExternalCollision:
         # Get the service ALMotion.
         motion_service  = self.session.service("ALMotion")
         #value to set is "All" and "Move" deactivation require the owner consent on Pepper,"Arms", "LArm" and "RArm" deactivation does not require the owner consent.
-        motion_service.setExternalCollisionProtectionEnabled("Move", self.isActivatedExtColl)
+        motion_service.setExternalCollisionProtectionEnabled("All", self.isActivatedExtColl)
+        # motion_service.setExternalCollisionProtectionEnabled("Move", self.isActivatedExtColl)
+
 
         motion_service.setDiagnosisEffectEnabled(self.isActivatedAutoDiagReflex)
         rospy.loginfo("WARNING --> isActivatedExtColl:"+str(self.isActivatedExtColl))
