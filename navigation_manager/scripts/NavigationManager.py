@@ -2,38 +2,32 @@
 __author__ = 'Kathrin Evers'
 __author__ ='Jacques Saraydaryan'
 
-# ###############################
-#       Import for ROS         #
-################################
-import rospy
-import uuid
-import tf
-import math
 import json
-from tf import TransformListener
-from robocup_msgs.msg import InterestPoint, Action, NavigationAction
-from robocup_msgs.msg import gm_bus_msg
-#from nav_pos_gateway_client.msg import NavGoalToGateway
-from map_manager.srv import getitP_service
-#from follow_me_mng.msg import FollowMeCmd
-from geometry_msgs.msg import Pose, PoseStamped
-from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
-from navigation_manager.msg import NavMngAction
-# Brings in the SimpleActionClient
-import actionlib
+import math
 
-from common.navstrategy.SimplyGoNavStrategy import SimplyGoNavStrategy
+import actionlib
+import rospy
+import tf
+import tf.transformations
+from geometry_msgs.msg import Pose, PoseStamped
+from move_base_msgs.msg import MoveBaseAction
+import dynamic_reconfigure.client
+
+from map_manager.srv import *
+# from nav_pos_gateway_client.msg import NavGoalToGateway
+# from follow_me_mng.msg import FollowMeCmd
+from navigation_manager.msg import NavMngAction
+from robocup_msgs.msg import gm_bus_msg
+
 from common.navstrategy.GoAndRetryNavStrategy import GoAndRetryNavStrategy
+from common.navstrategy.GoCRRCloseToGoal import GoCRRCloseToGoal
 from common.navstrategy.GoCleanRetryNavStrategy import GoCleanRetryNavStrategy
 from common.navstrategy.GoCleanRetryReplayLastNavStrategy import GoCleanRetryReplayLastNavStrategy
-from common.navstrategy.GoCRRCloseToGoal import GoCRRCloseToGoal
+from common.navstrategy.SimplyGoNavStrategy import SimplyGoNavStrategy
+from common.navstrategy.itm_clean_retry_nav import ItMCleanRetryNav
+from common.navstrategy.itm_retry_nav import ItMRetryNav
+from common.navstrategy.itm_simple_nav import ItMSimpleNav
 
-
-
-######### Command to Test
-##  rostopic pub /gm_bus_command robocup_msgs/gm_bus_msg "{'action': 'NP', 'action_id': '1', 'payload': 'A_sim', 'result': 0}" 
-## rostopic pub /gm_bus_command robocup_msgs/gm_bus_msg "{'action': 'NT', 'action_id': '1', 'payload': 'A_sim', 'result': 0}" 
-#########
 
 class Nm:
     # Initialize global variables
@@ -45,7 +39,7 @@ class Nm:
     #_pub_follow_me_order = ""
     #_sub_follow_me_answer = ""
     _tflistener = ""
-    _current_itP = ""
+    _current_itm = ""
     _current_action_id = ""
     _current_action_result = 0
     _current_payload = ""
@@ -59,25 +53,29 @@ class Nm:
     _actMove_base=""
     _actionToServiceMap={}
     _navigationStrategyMap={}
+    _path = []
 
     def __init__(self):
-        self.configure()
-
-        #
-        #  Set the initial configuration of the current Node
-        #
-
-    def configure(self):
         rospy.init_node('navigation_management_server')
 
         #initiate function on action
-        self._actionToServiceMap={"NP":self.npAction,"Goto":self.gotoAction,"NF":self.nfAction,"NFS":self.nfsAction,"NT":self.ntAction}
+        self._actionToServiceMap={"NP": self.npAction,
+                                  "Goto": self.gotoAction,
+                                  "NF": self.nfAction,
+                                  "NFS": self.nfsAction,
+                                  "NT": self.ntAction
+                                  }
         
         # initialize services and topics as well as function calls
         self._gm_bus_pub = rospy.Publisher("gm_bus_answer", gm_bus_msg, queue_size=1)
         self._gm_bus_sub = rospy.Subscriber("gm_bus_command", gm_bus_msg, self.gmBusListener)
-        #FIXME wait the service ?
-        self._getPoint_service = rospy.ServiceProxy('get_InterestPoint', getitP_service)
+
+        rospy.wait_for_service("/pepper/get_itm", 20)
+        self._get_itm_service = rospy.ServiceProxy("/pepper/get_itm", GetItM)
+        rospy.wait_for_service("/pepper/make_path", 20)
+        self._make_path_service = rospy.ServiceProxy("/pepper/make_path", MakePath)
+        rospy.wait_for_service("/pepper/update_graph", 5)
+        self.update_graph_service = rospy.ServiceProxy("/pepper/update_graph", UpdateGraph)
 
         # Subscribe to the move_base action server
         self._actMove_base = actionlib.SimpleActionClient("move_base", MoveBaseAction)
@@ -85,15 +83,24 @@ class Nm:
         self._actMove_base.wait_for_server(rospy.Duration(60))
         #FIXME What happen if action server is not available ?
         rospy.loginfo("Connected to move base server")
+        self.dyn_rec_client = dynamic_reconfigure.client.Client("/move_base/DWAPlannerROS")
 
-        self._navigationStrategyMaps={"Simple":SimplyGoNavStrategy(self._actMove_base),"Retry":GoAndRetryNavStrategy(self._actMove_base),"CleanAndRetry":GoCleanRetryNavStrategy(self._actMove_base),"CleanRetryReplay":GoCleanRetryReplayLastNavStrategy(self._actMove_base),"CRRCloseToGoal":GoCRRCloseToGoal(self._actMove_base)}
-        self._tflistener = TransformListener()
+
+        self._navigationStrategyMaps={"Simple": SimplyGoNavStrategy(self._actMove_base),
+                                      "Retry": GoAndRetryNavStrategy(self._actMove_base),
+                                      "CleanAndRetry": GoCleanRetryNavStrategy(self._actMove_base),
+                                      "CleanRetryReplay": GoCleanRetryReplayLastNavStrategy(self._actMove_base),
+                                      "CRRCloseToGoal": GoCRRCloseToGoal(self._actMove_base),
+                                      "ItMSimple": ItMSimpleNav(self._actMove_base),
+                                      "ItMRetry": ItMRetryNav(self._actMove_base),
+                                      "ItMCR": ItMCleanRetryNav(self._actMove_base)
+                                      }
+        self._tflistener = tf.TransformListener()
 
         self._actionServer = actionlib.SimpleActionServer('navigation_manager', NavMngAction, self.executeActionServer, False)
         self._actionServer.start()
 
-
-        rospy.spin()  # spin() simply keeps python from exiting until this node is stopped
+        rospy.spin()
 
     def gmBusListener(self, data):
         if data.action in self._actionToServiceMap.keys():
@@ -109,48 +116,84 @@ class Nm:
         try:
             # call the process associating to the action
             #isActionSucceed=self._actionToServiceMap[data.action](data)
-            ### FIXME need to rework all _actionToServiceMap call...
-            if goal.action == "NP" :
-                current_navigationStrategy=self._navigationStrategyMaps[goal.navstrategy]  
-                isActionSucceed=self.navigateToGoal("None",goal.itP,goal.action,current_navigationStrategy,goal.itP_point.x,goal.itP_point.y)
+            # FIXME need to rework all _actionToServiceMap call...
+            if goal.action == "NP":
+                current_navigationStrategy = self._navigationStrategyMaps[goal.navstrategy]
+                isActionSucceed = self.navigateToGoal("None", goal.action, current_navigationStrategy, goal.goal_pose, goal.make_plan_mode)
             elif goal.action == "NT":
-                 self.turnAround(float(math.pi))
-                 isActionSucceed=True
+                self.turnAround(float(math.pi))
+                isActionSucceed = True
         except Exception as e:
             rospy.logwarn("unable to find or launch function corresponding to the action %s:, error:[%s]",str(goal.action), str(e))
         if isActionSucceed:
             self._actionServer.set_succeeded()
+            print("Navigation succeeded")
         else:
+            print("Navigation aborted")
             self._actionServer.set_aborted()
         return
 
-    #
-    # navigate to point
-    #
-    def navigate(self,current_message_id,current_itP,current_message_action,navigationStrategy):
-        self.navigateToGoal(current_message_id,current_itP,current_message_action,navigationStrategy,0,0)
+    def get_current_pose(self):
+        """
+        Returns the pose stamped of the robot
+        """
+        now = rospy.Time.now()
 
-    def navigateToGoal(self,current_message_id,current_itP,current_message_action,navigationStrategy,x,y):
-        if current_itP == '':
-            pt=Pose()
-            pt.position.x=x
-            pt.position.y=y
-            pt.orientation.x=0
-            pt.orientation.y=0
-            pt.orientation.z=0
-            pt.orientation.w=1
-            # Step 2: Use a navigation strategy
-            result= navigationStrategy.goto(None,pt)
-        else:
-            # Step 1: get pose of sent interest point label
-            itPoint = self._getPoint_service(current_itP)
-            # Step 2: Use a navigation strategy
-            result= navigationStrategy.goto(None,itPoint.itP.pose)
-        
+        self._tflistener.waitForTransform("/map", "/base_link", now, rospy.Duration(2))
+        (trans, rot) = self._tflistener.lookupTransform("/map", "/base_link", now)
+        robotPose = PoseStamped()
+        robotPose.header.frame_id = "map"
+        robotPose.header.stamp = rospy.Time.now()
+        robotPose.pose.position.x = trans[0]
+        robotPose.pose.position.y = trans[1]
+        robotPose.pose.position.z = trans[2]
+        robotPose.pose.orientation.x = rot[0]
+        robotPose.pose.orientation.y = rot[1]
+        robotPose.pose.orientation.z = rot[2]
+        robotPose.pose.orientation.w = rot[3]
+
+        return robotPose
+
+    @staticmethod
+    def convert_to_pose_stamped(pose):
+        tmp = PoseStamped()
+        tmp.header.frame_id = "map"
+        tmp.header.stamp = rospy.Time.now()
+        tmp.pose = pose
+
+        return tmp
+
+    def create_path(self, goal_pose, mode):
+        # Clean the list of points
+        self.clean_path()
+        # Get the two poses as geometry_msgs/PoseStamped messages
+        current_pose = self.get_current_pose()
+        tmp_ps = self.convert_to_pose_stamped(goal_pose)
+        # Call the make_path service, add ItMs and the goal
+        for itm in self._make_path_service(mode, current_pose, tmp_ps).list_of_itms:
+            self._path.append([itm.name, itm.pose])
+        self._path.append(["goal", goal_pose])
+
+    def navigateToGoal(self, current_message_id, current_message_action, navigationStrategy, pose, planning_mode):
+        result = False
+        self.create_path(pose, planning_mode)
+        self.reconfigure_param('yaw_goal_tolerance', 3.5)
+        # Call the navigation strategy to reach the goal
+        navigationStrategy.startTimeWatch()
+        for pt in self._path:
+            if pt[0] != "goal":
+                result = navigationStrategy.goto(pt[1])
+                if not result:
+                    self.update_graph("blocked", pt[0])
+            else:
+                self.reconfigure_param('yaw_goal_tolerance', 0.1)
+                result = navigationStrategy.goto(pt[1])
+
         # Step 3: Send result to the general Manager
-        resultId=4 #Failure
+        resultId=4  # Failure
         if result:
-            resultId=3 #Success
+            rospy.loginfo("Goal reached")
+            resultId=3  # Success
 
         gm_result = gm_bus_msg()
         gm_result.action = current_message_action
@@ -160,6 +203,21 @@ class Nm:
         self._gm_bus_pub.publish(gm_result)
         return result
 
+    def clean_path(self):
+        self._path = []
+
+    def reconfigure_param(self, param, value):
+        new_config = {param: value}
+        self.dyn_rec_client.update_configuration(new_config)
+
+    def update_graph(self, action, node):
+        if action == "blocked":
+            self.update_graph_service("", node, 30.0)
+        elif action == "free":
+            self.update_graph_service("", node, 1.0)
+        elif action == "reset":
+            self.update_graph_service("reset", node, 1.0)
+        return
 
     #
     # navigate by following a person
@@ -247,8 +305,8 @@ class Nm:
         # self._gm_bus_pub.publish(gm_result)
     def npAction(self,data):
         # navigate to point
-        self._current_itP = data.payload
-        rospy.loginfo("navigation: interest point = %s", self._current_itP)
+        self._current_itm = self._get_itm_service(data.payload)
+        rospy.loginfo("navigation: interest point = %s", self._current_itm)
         self._current_message_action = data.action
         self._current_message_id = data.action_id
         self._repetitions = 0
@@ -257,7 +315,7 @@ class Nm:
         #current_navigationStrategy=self._navigationStrategyMaps["CleanAndRetry"]  
         current_navigationStrategy=self._navigationStrategyMaps["CleanRetryReplay"]  
              
-        self.navigate(self._current_message_id,self._current_itP,self._current_message_action,current_navigationStrategy)
+        self.navigateToGoal(self._current_message_id, self._current_message_action, current_navigationStrategy, self._current_itm.itm.pose)
 
     def gotoAction(self,data):
         # navigate to point
