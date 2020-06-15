@@ -3,10 +3,12 @@ string action
 string itP
 string navstrategy
 geometry_msgs/Point itP_point
+float32 rotation_angle
 
 ---
 #result definition
 int32 result
+
 ---
 #feedback
 int32 feedback
