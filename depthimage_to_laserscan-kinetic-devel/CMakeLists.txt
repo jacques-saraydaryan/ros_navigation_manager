@@ -1,5 +1,5 @@
 # http://ros.org/doc/groovy/api/catkin/html/user_guide/supposed.html
-#cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8)
 project(depthimage_to_laserscan)
 
 # Load catkin and all dependencies required for this package
