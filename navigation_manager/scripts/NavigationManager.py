@@ -82,9 +82,13 @@ class Nm:
         # Subscribe to the move_base action server
         self._actMove_base = actionlib.SimpleActionClient("move_base", MoveBaseAction)
         rospy.loginfo("Waiting for move_base action server...")
-        self._actMove_base.wait_for_server(rospy.Duration(60))
+
         #FIXME What happen if action server is not available ?
-        rospy.loginfo("Connected to move base server")
+        finished = self._actMove_base.wait_for_server(rospy.Duration(10))
+        if finished:
+            rospy.loginfo("Connected to move base server")
+        else:
+            rospy.logwarn("Couldn't connect to move base server")
 
         self._navigationStrategyMaps={"Simple":SimplyGoNavStrategy(self._actMove_base),"Retry":GoAndRetryNavStrategy(self._actMove_base),"CleanAndRetry":GoCleanRetryNavStrategy(self._actMove_base),"CleanRetryReplay":GoCleanRetryReplayLastNavStrategy(self._actMove_base),"CRRCloseToGoal":GoCRRCloseToGoal(self._actMove_base)}
         self._tflistener = TransformListener()
