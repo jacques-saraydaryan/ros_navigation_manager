@@ -209,7 +209,7 @@ class Nm:
 
         # 1: load current orientation
         rospy.loginfo("In turn around function")
-        now = rospy.Time.now()
+        now = rospy.Time(0)
         self._tflistener.waitForTransform("/map", "base_footprint", now, rospy.Duration(2))
         (trans, rot) = self._tflistener.lookupTransform("/map", "base_footprint", now)
         robotPose = Pose()

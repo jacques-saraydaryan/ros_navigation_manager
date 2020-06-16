@@ -127,7 +127,7 @@ class GoCRRCloseToGoal(GoCleanRetryReplayLastNavStrategy,object):
         return False
                 
     def getRobotPose(self):
-        self._tflistener.waitForTransform("/base_link", "/map", rospy.Time.now(), rospy.Duration(5.0))
+        self._tflistener.waitForTransform("/base_link", "/map", rospy.Time(0), rospy.Duration(5.0))
         robot_p=PoseStamped()
         robot_p.header.frame_id="/base_link"
         robot_p.pose.position.x=0
@@ -201,7 +201,7 @@ class GoCRRCloseToGoal(GoCleanRetryReplayLastNavStrategy,object):
             start=startPoseStamped
             goal=PoseStamped()
             goal.header.frame_id = 'map'
-            goal.header.stamp = rospy.Time.now()
+            goal.header.stamp = rospy.Time(0)
             goal.pose=targetPose
             tolerance=self.MAKE_PLAN_TOLERANCE
             #rospy.logwarn('before make plan')

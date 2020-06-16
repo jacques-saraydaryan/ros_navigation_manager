@@ -15,7 +15,7 @@ class SimplyGoNavStrategy(AbstractNavStrategy):
         current_goal = MoveBaseGoal()
         current_goal.target_pose.pose=targetPose       
         current_goal.target_pose.header.frame_id = 'map'
-        current_goal.target_pose.header.stamp = rospy.Time.now()
+        current_goal.target_pose.header.stamp = rospy.Time(0)
         # Start the robot toward the next location
         self._actMove_base.send_goal(current_goal)
 

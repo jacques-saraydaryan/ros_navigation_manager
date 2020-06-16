@@ -43,7 +43,7 @@ class GoCleanRetryNavStrategy(AbstractNavStrategy):
         current_goal = MoveBaseGoal()
         current_goal.target_pose.pose=targetPose       
         current_goal.target_pose.header.frame_id = 'map'
-        current_goal.target_pose.header.stamp = rospy.Time.now()
+        current_goal.target_pose.header.stamp = rospy.Time(0)
 
         #Start global Timer
         self.startTimeWatch()
