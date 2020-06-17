@@ -118,7 +118,7 @@ class Nm:
                 current_navigationStrategy=self._navigationStrategyMaps[goal.navstrategy]  
                 isActionSucceed=self.navigateToGoal("None",goal.itP,goal.action,current_navigationStrategy,goal.itP_point.x,goal.itP_point.y)
             elif goal.action == "NT":
-                 self.turnAround(float(math.pi))
+                 self.turnAround(float(goal.rotation_angle))
                  isActionSucceed=True
         except Exception as e:
             rospy.logwarn("unable to find or launch function corresponding to the action %s:, error:[%s]",str(goal.action), str(e))
