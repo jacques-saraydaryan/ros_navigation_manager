@@ -3,7 +3,7 @@
 """Example: Use setExternalCollisionProtectionEnabled Method"""
 
 import qi
-import argparse
+# import argparse
 import sys
 import rospy
 
@@ -14,7 +14,7 @@ def CollisionDistance(session):
     """
     # Get the service ALMotion.
 
-    motion_service  = session.service("ALMotion")
+    motion_service = session.service("ALMotion")
 
     motion_service.setOrthogonalSecurityDistance(0.05)
     motion_service.setTangentialSecurityDistance(0.05)
@@ -27,12 +27,12 @@ if __name__ == "__main__":
     ip=rospy.get_param('~ip',"127.0.0.1")
     port=rospy.get_param('~port',9559)
    
-    session = qi.Session()
+    s = qi.Session()
     try:
-        session.connect("tcp://" + ip + ":" + str(port))
+        s.connect("tcp://" + ip + ":" + str(port))
     except RuntimeError:
         print ("Can't connect to Naoqi at ip \"" + ip + "\" on port " + str(port) +".\n"
                "Please check your script arguments. Run with -h option for help.")
         sys.exit(1)
-    CollisionDistance(session)
+    CollisionDistance(s)
     rospy.loginfo("Collision distance has been set to 0.05...")

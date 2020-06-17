@@ -16,7 +16,7 @@ class ItMRetryNav(AbstractNavStrategy):
             isActionResultSuccess = self._actMove_base.wait_for_result(rospy.Duration.from_sec(self._maxWaitTimePerGoal))
             current_action_state = self._actMove_base.get_state()
             if isActionResultSuccess and current_action_state == 3:
-                rospy.loginfo("Goal Successfully achieved")
+                rospy.loginfo("Goal Successfully achieved at position : \n{} \n".format(targetPose))
                 self.reset()
                 return True
             else:

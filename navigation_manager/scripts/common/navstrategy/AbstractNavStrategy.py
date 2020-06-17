@@ -57,7 +57,7 @@ class AbstractNavStrategy:
 
     def set_current_goal(self, goal):
         """
-        Update the current_goal with the geometry_msgs/Pose goal
+        Update the current_goal with the geometry_msgs/Pose goal in parameter
         """
         self.current_goal.target_pose.header.frame_id = "map"
         self.current_goal.target_pose.header.stamp = rospy.Time.now()

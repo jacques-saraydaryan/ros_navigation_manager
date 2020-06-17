@@ -70,9 +70,11 @@ class Nm:
         self._gm_bus_pub = rospy.Publisher("gm_bus_answer", gm_bus_msg, queue_size=1)
         self._gm_bus_sub = rospy.Subscriber("gm_bus_command", gm_bus_msg, self.gmBusListener)
 
-        rospy.wait_for_service("/pepper/get_itm", 20)
+        rospy.wait_for_service("/pepper/get_itm", 5)
         self._get_itm_service = rospy.ServiceProxy("/pepper/get_itm", GetItM)
-        rospy.wait_for_service("/pepper/make_path", 20)
+        rospy.wait_for_service("/pepper/modify_itm", 5)
+        self._modify_itm_service = rospy.ServiceProxy("/pepper/modify_itm", ModifyItM)
+        rospy.wait_for_service("/pepper/make_path", 5)
         self._make_path_service = rospy.ServiceProxy("/pepper/make_path", MakePath)
         rospy.wait_for_service("/pepper/update_graph", 5)
         self.update_graph_service = rospy.ServiceProxy("/pepper/update_graph", UpdateGraph)
@@ -163,17 +165,6 @@ class Nm:
 
         return tmp
 
-    def create_path(self, goal_pose, mode):
-        # Clean the list of points
-        self.clean_path()
-        # Get the two poses as geometry_msgs/PoseStamped messages
-        current_pose = self.get_current_pose()
-        tmp_ps = self.convert_to_pose_stamped(goal_pose)
-        # Call the make_path service, add ItMs and the goal
-        for itm in self._make_path_service(mode, current_pose, tmp_ps).list_of_itms:
-            self._path.append([itm.name, itm.pose])
-        self._path.append(["goal", goal_pose])
-
     def navigateToGoal(self, current_message_id, current_message_action, navigationStrategy, pose, planning_mode):
         result = False
         self.create_path(pose, planning_mode)
@@ -185,6 +176,10 @@ class Nm:
                 result = navigationStrategy.goto(pt[1])
                 if not result:
                     self.update_graph("blocked", pt[0])
+                    self._modify_itm_service(pt[0], "color", "RED")
+                else:
+                    self.update_graph("free", pt[0])
+                    self._modify_itm_service(pt[0], "color", "GREEN")
             else:
                 self.reconfigure_param('yaw_goal_tolerance', 0.1)
                 result = navigationStrategy.goto(pt[1])
@@ -202,6 +197,26 @@ class Nm:
         gm_result.result = resultId
         self._gm_bus_pub.publish(gm_result)
         return result
+
+    def create_path(self, goal_pose, mode):
+        # Clean the list of points
+        self.clean_path()
+        # Get the two poses as geometry_msgs/PoseStamped messages
+        current_pose = self.get_current_pose()
+        tmp_pose_stamped = self.convert_to_pose_stamped(goal_pose)
+        # Call the make_path service, add ItMs and the goal
+        for itm in self._make_path_service(mode, current_pose, tmp_pose_stamped).list_of_itms:
+            self.add_itm_on_path(itm)
+        self._path.append(["goal", goal_pose])
+
+    def add_itm_on_path(self, itm):
+        self._path.append([itm.name, itm.pose])
+        self._modify_itm_service(itm.name, "color", "BLUE")
+
+    def remove_itm_on_path(self, itm_name):
+        for obj in self._path:
+            if obj[0] == itm_name:
+                self._path.remove(obj)
 
     def clean_path(self):
         self._path = []

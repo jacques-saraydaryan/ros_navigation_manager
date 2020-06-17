@@ -36,12 +36,12 @@ class ItMCleanRetryNav(AbstractNavStrategy):
             current_action_state = self._actMove_base.get_state()
 
             if isActionResultSuccess and current_action_state == 3:
-                rospy.loginfo('Goal Successfully achieved')
+                rospy.loginfo("Goal Successfully achieved at position : \n{} \n".format(targetPose))
                 self.reset()
                 return True
             else:
                 rospy.logwarn('Goal FAILURE')
-                rospy.logwarn('Retrying, ' + str(self._retry_max_nb - self._retry_nb -1) + ' attempts remaining')
+                rospy.logwarn('Retrying, ' + str(self._retry_max_nb - self._retry_nb - 1) + ' attempts remaining')
                 rospy.loginfo('Clear all costmaps')
                 self.resetCostMaps()
                 self._retry_nb += 1
