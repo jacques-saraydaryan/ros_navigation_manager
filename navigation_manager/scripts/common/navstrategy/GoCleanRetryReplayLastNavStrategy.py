@@ -92,7 +92,7 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
         current_goal = MoveBaseGoal()
         current_goal.target_pose.pose=targetPose       
         current_goal.target_pose.header.frame_id = 'map'
-        current_goal.target_pose.header.stamp = rospy.time(0)
+        current_goal.target_pose.header.stamp = rospy.Time(0)
 	    
         # check if global retry and global timer are not trigged
         while (self._retry_nb < self._retry_max_nb) and (not self._timeout_checker) and (not self._stopCurrentNav) and (not rospy.is_shutdown()):
@@ -144,9 +144,9 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
         #Create Goal action Message
         #self._actMove_base.cancel_all_goals()
         #self._actMove_base.cancel_goal()
-        #rospy.time(0)
+        #rospy.Time(0)
         #rospy.get_rostime()
-        self._actMove_base.cancel_goals_at_and_before_time(rospy.time(0))
+        self._actMove_base.cancel_goals_at_and_before_time(rospy.Time(0))
         #CAUTION update the global_cost_map publish_frequency parameter to work with this wait time (e.g 2.0hz) +update frequency (e.g 2.5hz) 
         rospy.sleep(0.5)
        
@@ -214,7 +214,7 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
 
 
     def isBaseLinkIntoGlobalCostMap(self):
-        now = rospy.time(0)
+        now = rospy.Time(0)
         self._tflistener.waitForTransform("/map", "/base_link", now, rospy.Duration(2.0))
         (trans, rot) = self._tflistener.lookupTransform("/map", "/base_link", now)
         global_cost_value=self.getCostMapValue(trans[0],trans[1],self._globalCostMap)
@@ -242,9 +242,12 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
         grid_x = int(round((x - map.info.origin.position.x) / map.info.resolution))
         grid_y = int(round((y - map.info.origin.position.y) / map.info.resolution))
 
-        #CAUTION not sure of behavior id map is not square e.g width != height...
+        #CAUTION not sure of behavior if map is not square e.g width != height...
         index_y= int(round(grid_y * map.info.width))
         #FIXME TO BE CHECKED!!!
+        rospy.logwarn("MAP LEN : %s",str(len(map.data)))
+        rospy.logwarn("grid_X+index_Y : %s",str(grid_x+index_y))
+        rospy.logwarn("grid_X+grid_Y : %s",str(grid_x+grid_y))
         return map.data[grid_x+index_y]
        
 
