@@ -217,7 +217,9 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
         now = rospy.Time(0)
         self._tflistener.waitForTransform("/map", "/base_link", now, rospy.Duration(2.0))
         (trans, rot) = self._tflistener.lookupTransform("/map", "/base_link", now)
+        rospy.loginfo("GLOBAL COSTMAP DEBUG")
         global_cost_value=self.getCostMapValue(trans[0],trans[1],self._globalCostMap)
+        rospy.loginfo("LOCAL COSTMAP DEBUG")
         local_cost_value=self.getCostMapValue(trans[0],trans[1],self._localCostMap)
 
         if global_cost_value >= self._maxCostMapTolerance or local_cost_value >= self._maxCostMapTolerance:
@@ -239,17 +241,36 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
 
 
     def getCostMapValue(self,x,y,map):
-        grid_x = int(round((x - map.info.origin.position.x) / map.info.resolution))
-        grid_y = int(round((y - map.info.origin.position.y) / map.info.resolution))
 
-        #CAUTION not sure of behavior if map is not square e.g width != height...
-        index_y= int(round(grid_y * map.info.width))
-        #FIXME TO BE CHECKED!!!
-        rospy.logwarn("MAP LEN : %s",str(len(map.data)))
-        rospy.logwarn("grid_X+index_Y : %s",str(grid_x+index_y))
-        rospy.logwarn("grid_X+grid_Y : %s",str(grid_x+grid_y))
-        return map.data[grid_x+index_y]
-       
+        rospy.loginfo("X : %s",str(x))
+        rospy.loginfo("Y : %s",str(y))
+
+        rospy.loginfo("MAP ORIGIN X : %s",str(map.info.origin.position.x))
+        rospy.loginfo("MAP ORIGIN Y : %s",str(map.info.origin.position.y))
+
+        rospy.loginfo("MAP RESOLUTION %s",str(map.info.resolution))
+        rospy.loginfo("MAP WIDTH %s",str(map.info.width))
+        rospy.loginfo("MAP HEIGHT %s",str(map.info.height))
+
+        try:
+
+            grid_x = int(round((x - map.info.origin.position.x) / map.info.resolution))
+            grid_y = int(round((y - map.info.origin.position.y) / map.info.resolution))
+
+            rospy.logwarn("GRID_X %s",str(grid_x))
+            rospy.logwarn("GRID_Y %s",str(grid_y))
+
+            #CAUTION not sure of behavior if map is not square e.g width != height...
+            index_y = int(round(grid_y * map.info.width))
+            #FIXME TO BE CHECKED!!!
+            rospy.logwarn("MAP LEN : %s",str(len(map.data)))
+            rospy.logwarn("INDEX_Y %s",str(index_y))
+
+
+            return map.data[grid_x+index_y]
+        except Exception as e:
+            rospy.logerr("{class_name} : %s".format(class_name=self.__class__.__name__),str(e))
+            return 0
 
 
     def globalCostMap_callback(self,msg):
