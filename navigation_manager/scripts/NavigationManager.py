@@ -9,7 +9,7 @@ import actionlib
 import rospy
 import tf
 import tf.transformations
-from geometry_msgs.msg import Pose, PoseStamped
+from geometry_msgs.msg import PoseStamped
 from move_base_msgs.msg import MoveBaseAction
 import dynamic_reconfigure.client
 
@@ -27,19 +27,13 @@ from common.navstrategy.SimplyGoNavStrategy import SimplyGoNavStrategy
 from common.navstrategy.itm_clean_retry_nav import ItMCleanRetryNav
 from common.navstrategy.itm_retry_nav import ItMRetryNav
 from common.navstrategy.itm_simple_nav import ItMSimpleNav
+from common.navstrategy.go_through_door import GoThroughDoor
 
 
 class Nm:
-    # Initialize global variables
-    _gm_bus_pub = ""
-    _gm_bus_sub = ""
-    _getPoint_service = ""
-    _pub_goal = ""
-    _sub_goal = ""
     #_pub_follow_me_order = ""
     #_sub_follow_me_answer = ""
-    _tflistener = ""
-    _current_itm = ""
+    _current_node = ""
     _current_action_id = ""
     _current_action_result = 0
     _current_payload = ""
@@ -50,43 +44,38 @@ class Nm:
     #_current_follow_id = 0
     #_last_body_time = 0
     #_current_body_id = ""
-    _actMove_base=""
-    _actionToServiceMap={}
-    _navigationStrategyMap={}
-    _path = []
 
     def __init__(self):
         rospy.init_node('navigation_management_server')
 
-        #initiate function on action
-        self._actionToServiceMap={"NP": self.npAction,
-                                  "Goto": self.gotoAction,
-                                  "NF": self.nfAction,
-                                  "NFS": self.nfsAction,
-                                  "NT": self.ntAction
-                                  }
+        self._nodes_path = []
+        self._edges_path = []
+        self._current_pose = PoseStamped()
+        self._tflistener = tf.TransformListener()
         
         # initialize services and topics as well as function calls
         self._gm_bus_pub = rospy.Publisher("gm_bus_answer", gm_bus_msg, queue_size=1)
         self._gm_bus_sub = rospy.Subscriber("gm_bus_command", gm_bus_msg, self.gmBusListener)
 
-        rospy.wait_for_service("/pepper/get_itm", 5)
-        self._get_itm_service = rospy.ServiceProxy("/pepper/get_itm", GetItM)
-        rospy.wait_for_service("/pepper/modify_itm", 5)
-        self._modify_itm_service = rospy.ServiceProxy("/pepper/modify_itm", ModifyItM)
+        rospy.wait_for_service("/pepper/get_node", 5)
+        self._get_node_service = rospy.ServiceProxy("/pepper/get_node", GetNode)
+        rospy.wait_for_service("/pepper/modify_node", 5)
+        self._modify_node_service = rospy.ServiceProxy("/pepper/modify_node", ModifyNode)
         rospy.wait_for_service("/pepper/make_path", 5)
         self._make_path_service = rospy.ServiceProxy("/pepper/make_path", MakePath)
         rospy.wait_for_service("/pepper/update_graph", 5)
-        self.update_graph_service = rospy.ServiceProxy("/pepper/update_graph", UpdateGraph)
+        self._update_graph_service = rospy.ServiceProxy("/pepper/update_graph", UpdateGraph)
 
         # Subscribe to the move_base action server
         self._actMove_base = actionlib.SimpleActionClient("move_base", MoveBaseAction)
         rospy.loginfo("Waiting for move_base action server...")
-        self._actMove_base.wait_for_server(rospy.Duration(60))
-        #FIXME What happen if action server is not available ?
-        rospy.loginfo("Connected to move base server")
-        self.dyn_rec_client = dynamic_reconfigure.client.Client("/move_base/DWAPlannerROS")
+        if not self._actMove_base.wait_for_server(rospy.Duration(60)):
+            #FIXME What happen if action server is not available ?
+            rospy.logerr("Can't connect to move_base Action Server")
+            return
 
+        rospy.loginfo("Connected to move base server")
+        self._dyn_rec_client = dynamic_reconfigure.client.Client("/move_base/DWAPlannerROS")
 
         self._navigationStrategyMaps={"Simple": SimplyGoNavStrategy(self._actMove_base),
                                       "Retry": GoAndRetryNavStrategy(self._actMove_base),
@@ -95,9 +84,18 @@ class Nm:
                                       "CRRCloseToGoal": GoCRRCloseToGoal(self._actMove_base),
                                       "ItMSimple": ItMSimpleNav(self._actMove_base),
                                       "ItMRetry": ItMRetryNav(self._actMove_base),
-                                      "ItMCR": ItMCleanRetryNav(self._actMove_base)
+                                      "ItMCR": ItMCleanRetryNav(self._actMove_base),
+                                      "GTD": GoThroughDoor(self._actMove_base)
                                       }
-        self._tflistener = tf.TransformListener()
+        self.gtd_strategy = self._navigationStrategyMaps["GTD"]
+
+        # initiate function on action
+        self._actionToServiceMap = {"NP": self.npAction,
+                                    "Goto": self.gotoAction,
+                                    "NF": self.nfAction,
+                                    "NFS": self.nfsAction,
+                                    "NT": self.ntAction
+                                    }
 
         self._actionServer = actionlib.SimpleActionServer('navigation_manager', NavMngAction, self.executeActionServer, False)
         self._actionServer.start()
@@ -121,10 +119,23 @@ class Nm:
             # FIXME need to rework all _actionToServiceMap call...
             if goal.action == "NP":
                 current_navigationStrategy = self._navigationStrategyMaps[goal.navstrategy]
-                isActionSucceed = self.navigateToGoal("None", goal.action, current_navigationStrategy, goal.goal_pose, goal.make_plan_mode)
+                if goal.node != "":
+                    print("Navigation goal : node {}".format(goal.node))
+                    node_obj = self._get_node_service(goal.node).node
+                    if node_obj.name == "":
+                        rospy.logerr("Node of name {} doesn't exist, cancelling navigation".format(goal.node))
+                        self._actionServer.set_aborted()
+                        return
+                    pose = node_obj.pose
+                else:
+                    pose = goal.goal_pose
+                isActionSucceed = self.navigateToGoal("None", goal.action, current_navigationStrategy,
+                                                      goal.make_plan_mode, goal.side_door_crossing, pose)
+
             elif goal.action == "NT":
                 self.turnAround(float(math.pi))
                 isActionSucceed = True
+
         except Exception as e:
             rospy.logwarn("unable to find or launch function corresponding to the action %s:, error:[%s]",str(goal.action), str(e))
         if isActionSucceed:
@@ -165,24 +176,36 @@ class Nm:
 
         return tmp
 
-    def navigateToGoal(self, current_message_id, current_message_action, navigationStrategy, pose, planning_mode):
+    def navigateToGoal(self, current_message_id, current_message_action, navigationStrategy, planning_mode, side_door_crossing, goal_pose):
+        """
+        Navigate to the goal_pose using the navigation strategy and the planning mode corresponding to the parameters
+        """
         result = False
-        self.create_path(pose, planning_mode)
+        self.create_path(goal_pose, planning_mode)
         self.reconfigure_param('yaw_goal_tolerance', 3.5)
-        # Call the navigation strategy to reach the goal
+
+        # Call the navigation strategy to reach all nodes
         navigationStrategy.startTimeWatch()
-        for pt in self._path:
-            if pt[0] != "goal":
-                result = navigationStrategy.goto(pt[1])
-                if not result:
-                    self.update_graph("blocked", pt[0])
-                    self._modify_itm_service(pt[0], "color", "RED")
-                else:
-                    self.update_graph("free", pt[0])
-                    self._modify_itm_service(pt[0], "color", "GREEN")
+        for i in range(len(self._nodes_path)):
+            pt = self._nodes_path[i]
+            result = navigationStrategy.goto(self._current_pose, pt[1])
+            if not result:
+                self.update_graph("blocked", pt[0])
+                self._modify_node_service(pt[0], "color", "RED")
             else:
-                self.reconfigure_param('yaw_goal_tolerance', 0.1)
-                result = navigationStrategy.goto(pt[1])
+                self.update_graph("free", pt[0])
+                self._modify_node_service(pt[0], "color", "GREEN")
+                if pt != self._nodes_path[-1]:
+                    # Check if the edge to the next node is crossing a door :
+                    edge = self._edges_path[i]
+                    if side_door_crossing and edge.is_crossing_door and self.check_edge(edge, pt[0], self._nodes_path[i+1][0]):
+                        print("Executing GoThroughDoor strategy to reach node : {}".format(self._nodes_path[i+1]))
+                        crossing_result = self.gtd_strategy.goto(self._current_pose.pose, self._nodes_path[i+1][1])
+
+            self._current_pose = self.get_current_pose()
+
+        # Now we reach the goal :
+        result = navigationStrategy.goto(self._current_pose, goal_pose)
 
         # Step 3: Send result to the general Manager
         resultId=4  # Failure
@@ -201,37 +224,47 @@ class Nm:
     def create_path(self, goal_pose, mode):
         # Clean the list of points
         self.clean_path()
+
         # Get the two poses as geometry_msgs/PoseStamped messages
-        current_pose = self.get_current_pose()
+        self._current_pose = self.get_current_pose()
         tmp_pose_stamped = self.convert_to_pose_stamped(goal_pose)
-        # Call the make_path service, add ItMs and the goal
-        for itm in self._make_path_service(mode, current_pose, tmp_pose_stamped).list_of_itms:
-            self.add_itm_on_path(itm)
-        self._path.append(["goal", goal_pose])
 
-    def add_itm_on_path(self, itm):
-        self._path.append([itm.name, itm.pose])
-        self._modify_itm_service(itm.name, "color", "BLUE")
+        # Call the make_path service, add the nodes and edges
+        tmp_path = self._make_path_service(mode, self._current_pose, tmp_pose_stamped).path
+        for node in tmp_path.nodes:
+            self.add_node_on_path(node)
+        for edge in tmp_path.edges:
+            self.add_edge_on_path(edge)
 
-    def remove_itm_on_path(self, itm_name):
-        for obj in self._path:
-            if obj[0] == itm_name:
-                self._path.remove(obj)
+    def add_node_on_path(self, node):
+        self._nodes_path.append([node.name, node.pose])
+        self._modify_node_service(node.name, "color", "BLUE")
+
+    def add_edge_on_path(self, edge):
+        self._edges_path.append(edge)
 
     def clean_path(self):
-        self._path = []
+        self._nodes_path = []
+        self._edges_path = []
+
+    @staticmethod
+    def check_edge(edge, node_1, node_2):
+        if (edge.first_node == node_1 and edge.second_node == node_2) \
+                or (edge.first_node == node_2 and edge.second_node == node_1):
+            return True
+        return False
 
     def reconfigure_param(self, param, value):
         new_config = {param: value}
-        self.dyn_rec_client.update_configuration(new_config)
+        self._dyn_rec_client.update_configuration(new_config)
 
     def update_graph(self, action, node):
         if action == "blocked":
-            self.update_graph_service("", node, 30.0)
+            self._update_graph_service("", node, 30.0)
         elif action == "free":
-            self.update_graph_service("", node, 1.0)
+            self._update_graph_service("", node, 1.0)
         elif action == "reset":
-            self.update_graph_service("reset", node, 1.0)
+            self._update_graph_service("reset", node, 1.0)
         return
 
     #
@@ -278,31 +311,24 @@ class Nm:
 
         # 1: load current orientation
         rospy.loginfo("In turn around function")
-        now = rospy.Time.now()
-        self._tflistener.waitForTransform("/map", "base_footprint", now, rospy.Duration(2))
-        (trans, rot) = self._tflistener.lookupTransform("/map", "base_footprint", now)
-        robotPose = Pose()
-        robotPose.position.x = trans[0]
-        robotPose.position.y = trans[1]
-        robotPose.position.z = trans[2]
+        robotPose = self.get_current_pose()
 
-        quaternion = (rot[0], rot[1], rot[2], rot[3])
-        euler = tf.transformations.euler_from_quaternion(quaternion)
+        euler = tf.transformations.euler_from_quaternion(robotPose.pose.orientation)
         roll = euler[0]
         pitch = euler[1]
         yaw = euler[2] + data
         q = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
-        robotPose.orientation.x = q[0]
-        robotPose.orientation.y = q[1]
-        robotPose.orientation.z = q[2]
-        robotPose.orientation.w = q[3]
+        robotPose.pose.orientation.x = q[0]
+        robotPose.pose.orientation.y = q[1]
+        robotPose.pose.orientation.z = q[2]
+        robotPose.pose.orientation.w = q[3]
 
         #FIXME TO BE TESTED
         #strategy to apply
         current_navigationStrategy=self._navigationStrategyMaps["CRRCloseToGoal"]
         #Use a navigation strategy
         rospy.loginfo(robotPose)
-        result= current_navigationStrategy.goto(None,robotPose)
+        result= current_navigationStrategy.goto(self._current_pose, robotPose)
         return result
         
         #self._current_gateway_id = str(uuid.uuid1())
@@ -320,17 +346,20 @@ class Nm:
         # self._gm_bus_pub.publish(gm_result)
     def npAction(self,data):
         # navigate to point
-        self._current_itm = self._get_itm_service(data.payload)
-        rospy.loginfo("navigation: interest point = %s", self._current_itm)
+        _current_node = self._get_node_service(data.payload).node
+        if _current_node.name == "":
+            rospy.logerr("Node of name {} doesn't exist, cancelling navigation".format(data.payload))
+            return
+        rospy.loginfo("navigation to node = %s", _current_node)
         self._current_message_action = data.action
         self._current_message_id = data.action_id
         self._repetitions = 0
         #strategy to apply
         #current_navigationStrategy=self._navigationStrategyMaps["Simple"]
         #current_navigationStrategy=self._navigationStrategyMaps["CleanAndRetry"]  
-        current_navigationStrategy=self._navigationStrategyMaps["CleanRetryReplay"]  
-             
-        self.navigateToGoal(self._current_message_id, self._current_message_action, current_navigationStrategy, self._current_itm.itm.pose)
+        current_navigationStrategy=self._navigationStrategyMaps["ItMCR"]
+
+        self.navigateToGoal(self._current_message_id, self._current_message_action, current_navigationStrategy, "euclidian", False, _current_node.pose)
 
     def gotoAction(self,data):
         # navigate to point

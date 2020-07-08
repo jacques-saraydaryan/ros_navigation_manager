@@ -12,11 +12,11 @@ class ItMSimpleNav(AbstractNavStrategy):
     def __init__(self, actMove_base):
         AbstractNavStrategy.__init__(self, actMove_base)
 
-    def goto(self, targetPose):
+    def goto(self, current_pose, target_pose):
         """
         Abstract method that sends a simple navigation goal to reach `targetPose`
         """
-        self.set_current_goal(targetPose)
+        self.set_current_goal(target_pose)
         self._actMove_base.send_goal(self.current_goal)
         isActionResultSuccess = self._actMove_base.wait_for_result(rospy.Duration.from_sec(self._maxWaitTimePerGoal))
         current_action_state = self._actMove_base.get_state()
@@ -28,7 +28,7 @@ class ItMSimpleNav(AbstractNavStrategy):
             rospy.logwarn("Goal FAILURE")
             return False
         else:
-            rospy.loginfo("Goal Successfully achieved at position : \n{} \n".format(targetPose))
+            rospy.loginfo("Goal Successfully achieved at position : \n{} \n".format(target_pose))
             return True
 
     def stopAll(self):

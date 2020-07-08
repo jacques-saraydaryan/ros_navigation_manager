@@ -3,6 +3,7 @@ string action
 string navstrategy
 string make_plan_mode
 bool side_door_crossing
+string node
 geometry_msgs/Pose goal_pose
 
 ---

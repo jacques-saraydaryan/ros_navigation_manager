@@ -27,8 +27,8 @@ class ItMCleanRetryNav(AbstractNavStrategy):
 
         self._map_pub = rospy.Publisher('map', OccupancyGrid, queue_size=1)
 
-    def goto(self, targetPose):
-        self.set_current_goal(targetPose)
+    def goto(self, current_pose, target_pose):
+        self.set_current_goal(target_pose)
 
         while self._retry_nb < self._retry_max_nb:
             self._actMove_base.send_goal(self.current_goal)
@@ -36,7 +36,7 @@ class ItMCleanRetryNav(AbstractNavStrategy):
             current_action_state = self._actMove_base.get_state()
 
             if isActionResultSuccess and current_action_state == 3:
-                rospy.loginfo("Goal Successfully achieved at position : \n{} \n".format(targetPose))
+                rospy.loginfo("Goal Successfully achieved at position : \n{} \n".format(target_pose))
                 self.reset()
                 return True
             else:

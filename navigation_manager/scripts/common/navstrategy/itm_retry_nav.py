@@ -8,15 +8,15 @@ class ItMRetryNav(AbstractNavStrategy):
     def __init__(self, actMove_base):
         AbstractNavStrategy.__init__(self, actMove_base)
 
-    def goto(self, targetPose):
-        self.set_current_goal(targetPose)
+    def goto(self, current_pose, target_pose):
+        self.set_current_goal(target_pose)
 
         while self._retry_nb < self._retry_max_nb:
             self._actMove_base.send_goal(self.current_goal)
             isActionResultSuccess = self._actMove_base.wait_for_result(rospy.Duration.from_sec(self._maxWaitTimePerGoal))
             current_action_state = self._actMove_base.get_state()
             if isActionResultSuccess and current_action_state == 3:
-                rospy.loginfo("Goal Successfully achieved at position : \n{} \n".format(targetPose))
+                rospy.loginfo("Goal Successfully achieved at position : \n{} \n".format(target_pose))
                 self.reset()
                 return True
             else:

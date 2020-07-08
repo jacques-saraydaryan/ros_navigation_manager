@@ -20,7 +20,7 @@ class AbstractNavStrategy:
         self._actMove_base=actMove_base
 
     @abstractmethod
-    def goto(self, targetPose): pass
+    def goto(self, current_pose, target_pose): pass
 
     @abstractmethod
     def stopAll(self): pass

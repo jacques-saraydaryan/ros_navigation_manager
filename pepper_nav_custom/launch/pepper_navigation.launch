@@ -1,6 +1,6 @@
 <launch>
   
-  <arg name="map_file" default="$(find pepper_nav_custom)/maps/citi/etage_2_citi.yaml"/>
+  <arg name="map_file" default="$(find pepper_nav_custom)/maps/citi/etage_2_v2.yaml"/>
   <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
   
   <!-- start 3d information used by worldmanagement and navigation for 3d costmap update -->
@@ -13,7 +13,7 @@
  <arg name="pcl_topic" default="/pcl"/>
  <remap from="scan" to="$(arg scan_topic)"/>
  <remap from="pcl" to="$(arg pcl_topic)"/>
-<remap from="odom" to="/pepper_robot/odom"/>
+ <remap from="odom" to="/pepper_robot/odom"/>
   <!-- THEIR AMCL -->
 <!--   <arg name="custom_amcl_launch_file" default="$(find pepper_nav_custom)/launch/includes/ext/asus_xtion_pro_amcl.launch.xml"/>
   <arg name="initial_pose_x" default="0.0"/> 

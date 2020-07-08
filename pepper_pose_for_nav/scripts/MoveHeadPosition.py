@@ -62,11 +62,11 @@ class HeadFix:
                 headPitchPos = self._memory_service.getData("Device/SubDeviceList/HeadPitch/Position/Sensor/Value")
                 if self.needToFixHead(headPitchPos, headYawPos):
                     # FIXME: problem reactivation tracker when setAngles("HeadPitch") is sent
-                    # self._motion_service.setAngles("HeadYaw", self._yaw_value, self._fractionMaxSpeed)
-                    # self._motion_service.setAngles("HeadPitch", self._pitch_value, self._fractionMaxSpeed)
+                    self._motion_service.setAngles("HeadYaw", self._yaw_value, self._fractionMaxSpeed)
+                    self._motion_service.setAngles("HeadPitch", self._pitch_value, self._fractionMaxSpeed)
 
                     # So we tried DCM commands, but the problem persists
-                    self.dcm_srv(self._pitch_value, self._yaw_value)
+                    # self.dcm_srv(self._pitch_value, self._yaw_value)
 
             self.stop_tracker()
             time.sleep(0.1)
@@ -100,9 +100,9 @@ class HeadFix:
         self._continuous_fix_activated = req.continuous_fix
 
         if not self._continuous_fix_activated:
-            # self._motion_service.setAngles("HeadYaw", self._yaw_value, self._fractionMaxSpeed)
-            # self._motion_service.setAngles("HeadPitch", self._pitch_value, self._fractionMaxSpeed)
-            self.dcm_srv(self._pitch_value, self._yaw_value)
+            self._motion_service.setAngles("HeadYaw", self._yaw_value, self._fractionMaxSpeed)
+            self._motion_service.setAngles("HeadPitch", self._pitch_value, self._fractionMaxSpeed)
+            # self.dcm_srv(self._pitch_value, self._yaw_value)
 
             self._autolife_service.setAutonomousAbilityEnabled("BasicAwareness", True)
             self._basic_awareness_service.setStimulusDetectionEnabled("Sound", False)
