@@ -1,6 +1,7 @@
 <launch>
   
   <arg name="map_file" default="$(find pepper_nav_custom)/maps/citi/etage_2_v2.yaml"/>
+  <param name="map_file" value="$(arg map_file)"/>
   <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
   
   <!-- start 3d information used by worldmanagement and navigation for 3d costmap update -->
