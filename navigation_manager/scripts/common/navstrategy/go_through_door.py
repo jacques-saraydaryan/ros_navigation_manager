@@ -10,37 +10,17 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Range, LaserScan
 from tf.transformations import euler_from_quaternion
 
-SIMULATION = False       # TODO: False pour pepper reel
-
 
 class GoThroughDoor(AbstractNavStrategy):
     def __init__(self, actMove_base):
         AbstractNavStrategy.__init__(self, actMove_base)
 
-        if SIMULATION:
-            print("Initializing topics for simulation")
-            self._odom_sub = rospy.Subscriber("/pepper/odom", Odometry, self.odom_callback)
-            self._back_sonar_sub = rospy.Subscriber("/pepper/sonar_back", Range, self.back_sonar_callback)
-            self._front_sonar_sub = rospy.Subscriber("/pepper/sonar_front", Range, self.front_sonar_callback)
-            self._laser_left_sub = rospy.Subscriber("/pepper/scan_left", LaserScan, self.laser_left_cb)
-            self._laser_right_sub = rospy.Subscriber("/pepper/scan_right", LaserScan, self.laser_right_cb)
-            self._laser_front_sub = rospy.Subscriber("/pepper/scan_front", LaserScan, self.laser_front_cb)
-            self._twist_pub = rospy.Publisher("/pepper/cmd_vel", Twist, queue_size=1)
-
-            # In the simulation, Pepper goes on left if the value is negative, and on right if it's positive
-            # On the real Pepper it's the opposite
-            self.linear_speed_y_left = -0.1
-            self.linear_speed_y_right = 0.1
-        else:
-            print("Initializing topics for real Pepper")
-            self._odom_sub = rospy.Subscriber("/pepper_robot/odom", Odometry, self.odom_callback)
-            self._back_sonar_sub = rospy.Subscriber("/pepper_robot/sonar/back", Range, self.back_sonar_callback)
-            self._front_sonar_sub = rospy.Subscriber("/pepper_robot/sonar/front", Range, self.front_sonar_callback)
-            self._laser_sub = rospy.Subscriber("/pepper_robot/laser", LaserScan, self.laser_callback)
-            self._twist_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
-
-            self.linear_speed_y_left = 0.1
-            self.linear_speed_y_right = -0.1
+        print("Initializing GoThroughDoor strategy")
+        self._odom_sub = rospy.Subscriber("/pepper_robot/odom", Odometry, self.odom_callback)
+        self._back_sonar_sub = rospy.Subscriber("/pepper_robot/sonar/back", Range, self.back_sonar_callback)
+        self._front_sonar_sub = rospy.Subscriber("/pepper_robot/sonar/front", Range, self.front_sonar_callback)
+        self._laser_sub = rospy.Subscriber("/pepper_robot/laser", LaserScan, self.laser_callback)
+        self._twist_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
 
         self.odom_pose = Pose()
         self.yaw = 0.0
@@ -50,6 +30,8 @@ class GoThroughDoor(AbstractNavStrategy):
         self.left_laser_range = []
 
         self.twist = Twist()
+        self.linear_speed_y_left = 0.1
+        self.linear_speed_y_right = -0.1
 
         # When goto() is called, it saves the current_pose parameter into initial_pose so the robot can go back to its
         # initial pose if there's an obstacle
@@ -89,15 +71,6 @@ class GoThroughDoor(AbstractNavStrategy):
         self.front_laser_range = msg.ranges[23:-23]
         self.right_laser_range = msg.ranges[-15:]  # [-10:] to avoid the detection of the door ?
 
-    def laser_left_cb(self, msg):
-        self.left_laser_range = msg.ranges
-
-    def laser_right_cb(self, msg):
-        self.right_laser_range = msg.ranges
-
-    def laser_front_cb(self, msg):
-        self.front_laser_range = msg.ranges
-
     def goto(self, current_pose, target_pose):
         """
         current_pose : geometry_msgs/Pose, the current pose of the robot
@@ -118,12 +91,16 @@ class GoThroughDoor(AbstractNavStrategy):
         # Rotates in the direction of the target_pose, so the other side of the door (next MapNode to reach)
         print("Rotate in direction of door")
         angle = math.atan2(target_pose.position.y - current_pose.position.y, target_pose.position.x - current_pose.position.x)
-        print("Angle to reach : {}".format(angle))
-        print("Diff : {}".format(abs(angle - self.yaw)))
+        print("Angle to reach : {} rad".format(angle))
+        """
         self.twist.angular.z = -0.2
         while abs(angle - self.yaw) > 0.01:
             self._twist_pub.publish(self.twist)
+        """
+        self.adaptive_rotation(angle, 0.2, self.degree_to_rad(1))
+        print("Facing the door")
 
+        """
         # First rotation on the right (90°)
         print("First rotation")
         self.twist.angular.z = -0.2
@@ -146,6 +123,7 @@ class GoThroughDoor(AbstractNavStrategy):
 
         if self.obstacle_detected:
             print("Can t cross door, obstacle detected, moved back to initial position, returning failure to navigation manager")
+            self.safe_stop()
             self.reset()
             self.unsubscribe()
             return False
@@ -160,14 +138,12 @@ class GoThroughDoor(AbstractNavStrategy):
         target_rad = self.yaw + math.pi / 2
         while abs(target_rad - self.yaw) > 0.1:
             self._twist_pub.publish(self.twist)
-        self.twist.angular.z = 0
-        safety_time = rospy.Time.now() + rospy.Duration.from_sec(1)
-        while rospy.Time.now() < safety_time:
-            self._twist_pub.publish(self.twist)
 
+        self.safe_stop()
         self.reset()
         self.unsubscribe()
         return True
+        """
 
     def check_obstacle_front_and_back(self, rotation_time):
         """
@@ -223,47 +199,50 @@ class GoThroughDoor(AbstractNavStrategy):
         return True
 
     def adaptive_rotation(self, angle_to_reach, speed, max_error):
+        """
+        angle_to_reach : the angle in radians to reach
+        speed : the initial rotation speed
+        max_error : the tolerance on the angle in radians
+        """
         while abs(self.yaw - angle_to_reach) > max_error:
             if 0 < self.yaw < angle_to_reach or 0 > angle_to_reach > self.yaw:
                 rotation_sign = 1
             else:
                 rotation_sign = -1
             speed = rotation_sign * abs(speed * (self.yaw - angle_to_reach))
+            print("Rotation speed : {}".format(speed))
             self.twist.angular.z = speed
             self._twist_pub.publish(self.twist)
 
     def stopAll(self):
         pass
 
+    @staticmethod
+    def degree_to_rad(angle):
+        return angle * math.pi / 180
+
     def reset(self):
         self.obstacle_detected = False
         self.obstacle_distance = 100000.0
         self.obstacle_detected_time = 0.0
 
+    def safe_stop(self):
+        self.twist.linear = [0.0, 0.0, 0.0]
+        self.twist.angular = [0.0, 0.0, 0.0]
+        safety_time = rospy.Time.now() + rospy.Duration.from_sec(1)
+        while rospy.Time.now() < safety_time:
+            self._twist_pub.publish(self.twist)
+
     def subscribe(self):
-        if SIMULATION:
-            self._odom_sub = rospy.Subscriber("/pepper/odom", Odometry, self.odom_callback)
-            self._back_sonar_sub = rospy.Subscriber("/pepper/sonar_back", Range, self.back_sonar_callback)
-            self._front_sonar_sub = rospy.Subscriber("/pepper/sonar_front", Range, self.front_sonar_callback)
-            self._laser_left_sub = rospy.Subscriber("/pepper/scan_left", LaserScan, self.laser_left_cb)
-            self._laser_right_sub = rospy.Subscriber("/pepper/scan_right", LaserScan, self.laser_right_cb)
-            self._laser_front_sub = rospy.Subscriber("/pepper/scan_front", LaserScan, self.laser_front_cb)
-            self._twist_pub = rospy.Publisher("/pepper/cmd_vel", Twist, queue_size=1)
-        else:
-            self._odom_sub = rospy.Subscriber("/pepper_robot/odom", Odometry, self.odom_callback)
-            self._back_sonar_sub = rospy.Subscriber("/pepper_robot/sonar/back", Range, self.back_sonar_callback)
-            self._front_sonar_sub = rospy.Subscriber("/pepper_robot/sonar/front", Range, self.front_sonar_callback)
-            self._laser_sub = rospy.Subscriber("/pepper_robot/laser", LaserScan, self.laser_callback)
-            self._twist_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
+        self._odom_sub = rospy.Subscriber("/pepper_robot/odom", Odometry, self.odom_callback)
+        self._back_sonar_sub = rospy.Subscriber("/pepper_robot/sonar/back", Range, self.back_sonar_callback)
+        self._front_sonar_sub = rospy.Subscriber("/pepper_robot/sonar/front", Range, self.front_sonar_callback)
+        self._laser_sub = rospy.Subscriber("/pepper_robot/laser", LaserScan, self.laser_callback)
+        self._twist_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
 
     def unsubscribe(self):
         self._odom_sub.unregister()
         self._back_sonar_sub.unregister()
         self._front_sonar_sub.unregister()
         self._twist_pub.unregister()
-        if SIMULATION:
-            self._laser_left_sub.unregister()
-            self._laser_right_sub.unregister()
-            self._laser_front_sub.unregister()
-        else:
-            self._laser_sub.unregister()
+        self._laser_sub.unregister()
