@@ -219,8 +219,12 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
         (trans, rot) = self._tflistener.lookupTransform("/map", "/base_link", now)
         rospy.loginfo("GLOBAL COSTMAP DEBUG")
         global_cost_value=self.getCostMapValue(trans[0],trans[1],self._globalCostMap)
+        rospy.loginfo("global cost value isBaseLinkIntoCostMap : %s",str(global_cost_value))
+
         rospy.loginfo("LOCAL COSTMAP DEBUG")
         local_cost_value=self.getCostMapValue(trans[0],trans[1],self._localCostMap)
+        rospy.loginfo("local cost value isBaseLinkIntoCostMap : %s",str(local_cost_value))
+
 
         if global_cost_value >= self._maxCostMapTolerance or local_cost_value >= self._maxCostMapTolerance:
             return True
@@ -229,6 +233,8 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
             
     def isPtIntoCostMap(self,x,y):
         global_cost_value=self.getCostMapValue(x,y,self._globalCostMap)
+        rospy.loginfo("global cost value isPtIntoCostMap : %s",str(global_cost_value))
+
         #FIME need to adjust coord for local costmap
         #local_cost_value=self.getCostMapValue(x,y,self._localCostMap)
         local_cost_value=0
