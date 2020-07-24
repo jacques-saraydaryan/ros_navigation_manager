@@ -83,7 +83,10 @@ class GoCRRCloseToGoal(GoCleanRetryReplayLastNavStrategy,object):
         # check first time is plan is valid
         robotPose=self.getRobotPose()
         isplanValid=self.isValidPlan(robotPose,targetPose)
-        if not isplanValid:
+
+        if isplanValid:
+            rospy.loginfo("{class_name} : Current plan is valid".format(class_name=self.__class__.__name__))
+        else:
             rospy.logwarn("Current plan is not valid...")
             newgoal=self.getValidGoal(targetPose)
             rospy.loginfo(str(newgoal))
@@ -150,6 +153,11 @@ class GoCRRCloseToGoal(GoCleanRetryReplayLastNavStrategy,object):
         y1=source.position.y
         x2=target.position.x
         y2=target.position.y
+
+        # if x1 == x2 and y1 == y2:
+        #     rospy.logwarn("{class_name} : source and target have the same coordinates".format(class_name=self.__class__.__name__))
+        #     return None
+
         a,b=MathToolbox.getLineEquation(x1,y1,x2,y2)
         goalList=MathToolbox.getLineCirclePts(a,b,x2,y2,r)
         targetedPose=Pose()
@@ -185,8 +193,12 @@ class GoCRRCloseToGoal(GoCleanRetryReplayLastNavStrategy,object):
         while _nbRetryForValidMakePlan < self._maxNbRetryForValidMakePlan:
                 #get current robot position
                 robotPose=self.getRobotPose()
+
+                rospy.logwarn("{class_name} : ROBOT POSE : %s".format(class_name=self.__class__.__name__),str(robotPose))
                 #process new goal according tolerance
                 newGoal=self.processNewGoal(robotPose.pose,targetPose,self.TOLERANCE_TO_OBJECTIVE_STEP*(_nbRetryForValidMakePlan+1))
+                # if newGoal is None:
+                #     return None
                 isvalidPlan=self.isValidPlan(robotPose,newGoal)
                 if not isvalidPlan:
                     _nbRetryForValidMakePlan=_nbRetryForValidMakePlan+1
@@ -201,7 +213,9 @@ class GoCRRCloseToGoal(GoCleanRetryReplayLastNavStrategy,object):
             start=startPoseStamped
             goal=PoseStamped()
             goal.header.frame_id = 'map'
-            goal.header.stamp = rospy.Time(0)
+            # goal.header.stamp = rospy.Time(0)
+            goal.header.stamp = rospy.Time.now()
+
             goal.pose=targetPose
             tolerance=self.MAKE_PLAN_TOLERANCE
             #rospy.logwarn('before make plan')
@@ -216,9 +230,9 @@ class GoCRRCloseToGoal(GoCleanRetryReplayLastNavStrategy,object):
                     return False
                 return True
         except Exception as e:
-            rospy.logwarn("Service make plan call failed: %s" % e)
-            rospy.logwarn("Service make plan call failed  target goal: %s",str(targetPose.position))
-            rospy.logwarn("Service make plan call failed  robot pose: %s",str(start.pose.position))
+            rospy.logwarn("{class_name} : Service make plan call failed: %s".format(class_name=self.__class__.__name__) % e)
+            rospy.logwarn("{class_name} : Service make plan call failed  target goal: %s".format(class_name=self.__class__.__name__),str(targetPose.position))
+            rospy.logwarn("{class_name} : Service make plan call failed  robot pose: %s".format(class_name=self.__class__.__name__),str(start.pose.position))
             return False
 
 

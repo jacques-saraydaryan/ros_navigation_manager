@@ -111,6 +111,7 @@ class Nm:
     def executeActionServer(self, goal):
         isActionSucceed=False
         try:
+
             # call the process associating to the action
             #isActionSucceed=self._actionToServiceMap[data.action](data)
             ### FIXME need to rework all _actionToServiceMap call...
@@ -118,8 +119,9 @@ class Nm:
                 current_navigationStrategy=self._navigationStrategyMaps[goal.navstrategy]  
                 isActionSucceed=self.navigateToGoal("None",goal.itP,goal.action,current_navigationStrategy,goal.itP_point.x,goal.itP_point.y)
             elif goal.action == "NT":
-                    self.turnAround(float(goal.rotation_angle))
-                    isActionSucceed=True
+                self.turnAround(float(goal.rotation_angle))
+                isActionSucceed=True
+    
         except Exception as e:
             rospy.logwarn("unable to find or launch function corresponding to the action %s:, error:[%s]",str(goal.action), str(e))
         if isActionSucceed:

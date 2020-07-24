@@ -3,7 +3,7 @@ __author__ = 'Jacques Saraydaryan'
 from AbstractNavStrategy import AbstractNavStrategy
 import rospy
 from geometry_msgs.msg import Pose, PoseWithCovarianceStamped, PoseWithCovariance, Point, Quaternion, Twist
-from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionGoal
 from std_srvs.srv import Empty
 from nav_msgs.msg import OccupancyGrid
 from nav_msgs.srv import GetMap
@@ -79,7 +79,6 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
     def goto(self, sourcePose, targetPose):
         ##NEED TO Make stuff into another thread
 
-    
 
         #Start global Timer
         self.startTimeWatch()
@@ -87,24 +86,29 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
         self.stopAll()
         self._stopCurrentNav=False
 
-
-         #Create Goal action Message
+        #Create Goal action Message
         current_goal = MoveBaseGoal()
         current_goal.target_pose.pose=targetPose       
         current_goal.target_pose.header.frame_id = 'map'
-        current_goal.target_pose.header.stamp = rospy.Time(0)
+        # current_goal.target_pose.header.stamp = rospy.Time(0)
+        current_goal.target_pose.header.stamp = rospy.Time.now()
+
+        rospy.logwarn("{class_name} : goal sent to move base : %s".format(class_name=self.__class__.__name__),str(current_goal))
 	    
         # check if global retry and global timer are not trigged
         while (self._retry_nb < self._retry_max_nb) and (not self._timeout_checker) and (not self._stopCurrentNav) and (not rospy.is_shutdown()):
 
-           
             # Start the robot toward the next location
-            self._current_goalhandle =self._actMove_base.send_goal(current_goal)
+            rospy.loginfo("{class_name} : SENDING GOAL NOW : %s".format(class_name=self.__class__.__name__),str(rospy.Time.now()))
+            self._current_goalhandle = self._actMove_base.send_goal(current_goal)
 
             #launch navigation
+            rospy.logwarn("{class_name} : TIMEOUT JACQUES : %s".format(class_name=self.__class__.__name__),str(self._maxWaitTimePerGoal))
             self._actMove_base.wait_for_result(rospy.Duration.from_sec(self._maxWaitTimePerGoal))
-            current_action_state=self._actMove_base.get_state()
+            rospy.logwarn("{class_name} : AFTER WAIT FOR RESULT".format(class_name=self.__class__.__name__))
 
+            current_action_state=self._actMove_base.get_state()
+            rospy.loginfo("{class_name} : DEBUG CURRENT ACTION STATE : %s".format(class_name=self.__class__.__name__),str(current_action_state))
 
                 #if isActionResultSuccess and self._actMove_base.get_state()!= self.MOVE_BASE_ACTION_STATE_FAILURE:
             if  current_action_state==3 :
@@ -118,6 +122,12 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
                 #Reset current strategy parameters
                 self.reset()
                 return True
+
+            # elif current_action_state == 8 : 
+            #     rospy.loginfo("{class_name} : action state : %s".format(class_name=self.__class__.__name__),str(current_action_state))
+            #     return False
+
+
             else:
                 rospy.logwarn('Navigation_Management: action state:'+ str(self._actMove_base.get_state()))
                 rospy.logwarn('Goal FAILURE (waiting '+str(self._maxWaitTimePerGoal)+'): ' + str(current_goal).replace("\n",""))
@@ -132,9 +142,10 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
                     self.reverseLastTwist()
 
 
-                rospy.logwarn('Retrying (current retryNb:'+str(self._retry_nb)+', max retry'+str(self._retry_max_nb)+')')
+                rospy.logwarn('{class_name} : Retrying (current retryNb:'.format(class_name=self.__class__.__name__)+str(self._retry_nb)+', max retry'+str(self._retry_max_nb)+')')
                 self._retry_nb=self._retry_nb+1
-        rospy.logwarn('Goal FAILURE until retry and clearing, returning : [' + str(current_goal).replace("\n","")+']')
+        rospy.logwarn('{class_name} : Goal FAILURE until retry and clearing, returning : ['.format(class_name=self.__class__.__name__) + str(current_goal).replace("\n","")+']')
+        
         self.stopAll()
         self.reset()
         return False
@@ -146,7 +157,10 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
         #self._actMove_base.cancel_goal()
         #rospy.Time(0)
         #rospy.get_rostime()
+        rospy.logwarn("{class_name} : CANCELLING GOAL AT AND BEFORE TIME".format(class_name=self.__class__.__name__))
         self._actMove_base.cancel_goals_at_and_before_time(rospy.Time(0))
+        # self._actMove_base.cancel_goals_at_and_before_time(rospy.Time.now())
+
         #CAUTION update the global_cost_map publish_frequency parameter to work with this wait time (e.g 2.0hz) +update frequency (e.g 2.5hz) 
         rospy.sleep(0.5)
        
@@ -156,7 +170,7 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
             # call clear all costmap before perfoming navigation
             self._reset_costmap()
         except Exception as e:
-            rospy.loginfo("Service clear costmap call failed: %s" % e)
+            rospy.loginfo("{class_name} : Service clear costmap call failed: %s".format(class_name=self.__class__.__name__), str(e))
         #CAUTION Resending a map could cause robot localisation failure
         #Get map and republish to be sure that costmap are uptades again
         #try:
@@ -217,13 +231,13 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
         now = rospy.Time(0)
         self._tflistener.waitForTransform("/map", "/base_link", now, rospy.Duration(2.0))
         (trans, rot) = self._tflistener.lookupTransform("/map", "/base_link", now)
-        rospy.loginfo("GLOBAL COSTMAP DEBUG")
+        rospy.loginfo("{class_name} : GLOBAL COSTMAP DEBUG".format(class_name=self.__class__.__name__))
         global_cost_value=self.getCostMapValue(trans[0],trans[1],self._globalCostMap)
-        rospy.loginfo("global cost value isBaseLinkIntoCostMap : %s",str(global_cost_value))
+        rospy.loginfo("{class_name} : global cost value isBaseLinkIntoCostMap : %s".format(class_name=self.__class__.__name__),str(global_cost_value))
 
-        rospy.loginfo("LOCAL COSTMAP DEBUG")
+        rospy.loginfo("{class_name} : LOCAL COSTMAP DEBUG".format(class_name=self.__class__.__name__))
         local_cost_value=self.getCostMapValue(trans[0],trans[1],self._localCostMap)
-        rospy.loginfo("local cost value isBaseLinkIntoCostMap : %s",str(local_cost_value))
+        rospy.loginfo("{class_name} : local cost value isBaseLinkIntoCostMap : %s".format(class_name=self.__class__.__name__),str(local_cost_value))
 
 
         if global_cost_value >= self._maxCostMapTolerance or local_cost_value >= self._maxCostMapTolerance:
@@ -232,8 +246,9 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
             return False
             
     def isPtIntoCostMap(self,x,y):
+        rospy.loginfo("{class_name} : Is point into cost map ?".format(class_name=self.__class__.__name__))
         global_cost_value=self.getCostMapValue(x,y,self._globalCostMap)
-        rospy.loginfo("global cost value isPtIntoCostMap : %s",str(global_cost_value))
+        rospy.loginfo("{class_name} : global cost value isPtIntoCostMap : %s".format(class_name=self.__class__.__name__),str(global_cost_value))
 
         #FIME need to adjust coord for local costmap
         #local_cost_value=self.getCostMapValue(x,y,self._localCostMap)
@@ -248,34 +263,34 @@ class GoCleanRetryReplayLastNavStrategy(AbstractNavStrategy):
 
     def getCostMapValue(self,x,y,map):
 
-        rospy.loginfo("X : %s",str(x))
-        rospy.loginfo("Y : %s",str(y))
+        rospy.loginfo("{class_name} : X : %s".format(class_name=self.__class__.__name__),str(x))
+        rospy.loginfo("{class_name} : Y : %s".format(class_name=self.__class__.__name__),str(y))
 
-        rospy.loginfo("MAP ORIGIN X : %s",str(map.info.origin.position.x))
-        rospy.loginfo("MAP ORIGIN Y : %s",str(map.info.origin.position.y))
+        rospy.loginfo("{class_name} : MAP ORIGIN X : %s".format(class_name=self.__class__.__name__),str(map.info.origin.position.x))
+        rospy.loginfo("{class_name} : MAP ORIGIN Y : %s".format(class_name=self.__class__.__name__),str(map.info.origin.position.y))
 
-        rospy.loginfo("MAP RESOLUTION %s",str(map.info.resolution))
-        rospy.loginfo("MAP WIDTH %s",str(map.info.width))
-        rospy.loginfo("MAP HEIGHT %s",str(map.info.height))
+        rospy.loginfo("{class_name} : MAP RESOLUTION %s".format(class_name=self.__class__.__name__),str(map.info.resolution))
+        rospy.loginfo("{class_name} : MAP WIDTH %s".format(class_name=self.__class__.__name__),str(map.info.width))
+        rospy.loginfo("{class_name} : MAP HEIGHT %s".format(class_name=self.__class__.__name__),str(map.info.height))
 
         try:
 
             grid_x = int(round((x - map.info.origin.position.x) / map.info.resolution))
             grid_y = int(round((y - map.info.origin.position.y) / map.info.resolution))
 
-            rospy.logwarn("GRID_X %s",str(grid_x))
-            rospy.logwarn("GRID_Y %s",str(grid_y))
+            rospy.logwarn("{class_name} : GRID_X %s".format(class_name=self.__class__.__name__),str(grid_x))
+            rospy.logwarn("{class_name} : GRID_Y %s".format(class_name=self.__class__.__name__),str(grid_y))
 
             #CAUTION not sure of behavior if map is not square e.g width != height...
             index_y = int(round(grid_y * map.info.width))
             #FIXME TO BE CHECKED!!!
-            rospy.logwarn("MAP LEN : %s",str(len(map.data)))
-            rospy.logwarn("INDEX_Y %s",str(index_y))
+            rospy.logwarn("{class_name} : MAP LEN : %s".format(class_name=self.__class__.__name__),str(len(map.data)))
+            rospy.logwarn("{class_name} : INDEX_Y %s".format(class_name=self.__class__.__name__),str(index_y))
 
 
             return map.data[grid_x+index_y]
         except Exception as e:
-            rospy.logerr("{class_name} : %s".format(class_name=self.__class__.__name__),str(e))
+            rospy.logerr("{class_name} : ERROR TO GET COST MAP VALUE : %s . COST MAP VALUE SET TO 0".format(class_name=self.__class__.__name__),str(e))
             return 0
 
 
