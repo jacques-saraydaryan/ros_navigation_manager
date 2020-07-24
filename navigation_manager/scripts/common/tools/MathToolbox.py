@@ -8,7 +8,10 @@ from geometry_msgs.msg import Quaternion
 
 def getLineEquation(x1,y1,x2,y2):
     #y=ax+b
-    a=float(y1-y2)/float(x1-x2)
+    if x1 == x2:
+        a = 0
+    else:
+        a = float(y1-y2)/float(x1-x2)
     b=y2 - a*float(x2)
     return a,b
 
