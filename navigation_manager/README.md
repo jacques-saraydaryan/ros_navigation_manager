@@ -16,12 +16,15 @@ This framwork allows to defined custom navigation strategies that could be call 
 ## 2. Authors
 * Jacques Saraydaryan
 
+## 3. Contributors
+* Thomas Curé
+* Simon Ernst
 
-## 3. How to quote
+## 4. How to quote
 F. Jumel, J. Saraydaryan, R. Leber, L. Matignon, E. Lombardi, C. Wolf and O. Simonin,”Context Aware Robot Architecture, Application to the Robocup@Home Challenge”, RoboCup Symposium 2018
 
-## 4. Navigation creation procedure
-### 4.1 Create a navigation strategy file
+## 5. Navigation creation procedure
+### 5.1 Create a navigation strategy file
 Go to the scripts/common/navstrategy folder. Create a new file MyStrategy.py
 
 
@@ -82,7 +85,7 @@ class MyStrategy(AbstractNavStrategy):
 
 the goto method is called when a naivation is asked, in this example we only retry in case of failure or timeout.
 
-### 4.2 Update the NavigationManager.py file
+### 5.2 Update the NavigationManager.py file
 
 ```python
 ...
@@ -104,22 +107,22 @@ from common.navstrategy.MyScenario import MyScenario
        ...
 ``` 
 
-## 5. Node
-### 5.1 Subscribed Topics
+## 6. Node
+### 6.1 Subscribed Topics
 * gm_bus_command ([robocup_msgs/gm_bus_msg](https://github.com/jacques-saraydaryan/robocup_pepper-robocup_msgs/blob/master/msg/gm_bus_msg.msg)):
 Use to get order from [general manager](https://github.com/jacques-saraydaryan/robocup_pepper-general_mng) (if topic used)
 
 
-### 5.2 Publish Topics
+### 6.2 Publish Topics
 * gm_bus_command ([robocup_msgs/gm_bus_msg](https://github.com/jacques-saraydaryan/robocup_pepper-robocup_msgs/blob/master/msg/gm_bus_msg.msg)):
 Use to give feedback to [general manager](https://github.com/jacques-saraydaryan/robocup_pepper-general_mng) (if topic used)
 
 
-### 5.3 Subscribed service
+### 6.3 Subscribed service
 * get_InterestPoint ([map_manager/getitP_service](https://github.com/jacques-saraydaryan/robocup_pepper-world_mng/blob/master/map_manager/srv/getitP_service.srv)):
 Use to translate given interest point key into map coodinates
 
-### 5.4 Action
+### 6.4 Action
 
 * NavMng.action:
 Use to get order from [general manager](https://github.com/jacques-saraydaryan/robocup_pepper-general_mng) (if action used)
