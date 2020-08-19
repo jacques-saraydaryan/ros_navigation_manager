@@ -1,6 +1,7 @@
 #goal definition
 string action
 string navstrategy
+bool use_inter_markers
 string make_plan_mode
 bool side_door_crossing
 string node

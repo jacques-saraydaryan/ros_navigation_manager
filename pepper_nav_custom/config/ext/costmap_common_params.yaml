@@ -59,6 +59,16 @@ scan3:
     
 #might able to add real laser data
 
+
+sonar_layer:
+  enabled: true
+  topics: ['/pepper_robot/sonar/front', '/pepper_robot/sonar/back']
+  clear_threshold: 0.2
+  mark_threshold: 1.0
+  no_readings_timeout: 2.0
+  clear_on_max_reading: false
+
+
 #cost_scaling_factor and inflation_radius were now moved to the inflation_layer ns
 inflation_layer:
   enabled:              true

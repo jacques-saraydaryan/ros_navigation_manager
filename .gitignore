@@ -106,3 +106,4 @@ venv.bak/
 /.idea
 /pepper_pose_for_nav/scripts/test.py
 /pepper_pose_for_nav/scripts/disable_all_autonomous_behaviors.py
+/navigation_manager/scripts/test_nav_mng.py

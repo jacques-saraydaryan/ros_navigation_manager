@@ -119,18 +119,9 @@ class Nm:
             # FIXME need to rework all _actionToServiceMap call...
             if goal.action == "NP":
                 current_navigationStrategy = self._navigationStrategyMaps[goal.navstrategy]
-                if goal.node != "":
-                    print("Navigation goal : node {}".format(goal.node))
-                    node_obj = self._get_node_service(goal.node).node
-                    if node_obj.name == "":
-                        rospy.logerr("Node of name {} doesn't exist, cancelling navigation".format(goal.node))
-                        self._actionServer.set_aborted()
-                        return
-                    pose = node_obj.pose
-                else:
-                    pose = goal.goal_pose
-                isActionSucceed = self.navigateToGoal("None", goal.action, current_navigationStrategy,
-                                                      goal.make_plan_mode, goal.side_door_crossing, pose)
+
+                isActionSucceed = self.navigateToGoal("None", goal.action, current_navigationStrategy, goal.use_inter_markers,
+                                                      goal.make_plan_mode, goal.side_door_crossing, goal.node, goal.goal_pose)
 
             elif goal.action == "NT":
                 self.turnAround(float(math.pi))
@@ -176,36 +167,57 @@ class Nm:
 
         return tmp
 
-    def navigateToGoal(self, current_message_id, current_message_action, navigationStrategy, planning_mode, side_door_crossing, goal_pose):
+    def navigateToGoal(self, current_message_id, current_message_action, navigationStrategy, is_itm_strategy, planning_mode, side_door_crossing, goal_node, goal_pose):
         """
-        Navigate to the goal_pose using the navigation strategy and the planning mode corresponding to the parameters
+        Navigate to the goal_pose using the navigation strategy corresponding to the parameters
+        If is_itm_strategy is True, it calls the map_manager to search for a path of Nodes using the search methode corresponding to the planning_mode param
+        If goal_node is not empty, it tries to get the Node corresponding to the name, if it exists the navigation strategy goes straight to it
+        If side_door_crossing is True, the navigation strategy called (it must be a strategy using ItMs) will call the GoThroughDoor strategy when it reaches a Node and that the Edge to the next one is a "door"
         """
         result = False
-        self.create_path(goal_pose, planning_mode)
-        self.reconfigure_param('yaw_goal_tolerance', 3.5)
 
-        # Call the navigation strategy to reach all nodes
-        navigationStrategy.startTimeWatch()
-        for i in range(len(self._nodes_path)):
-            pt = self._nodes_path[i]
-            result = navigationStrategy.goto(self._current_pose, pt[1])
-            if not result:
-                self.update_graph("blocked", pt[0])
-                self._modify_node_service(pt[0], "color", "RED")
-            else:
-                self.update_graph("free", pt[0])
-                self._modify_node_service(pt[0], "color", "GREEN")
-                if pt != self._nodes_path[-1]:
-                    # Check if the edge to the next node is crossing a door :
-                    edge = self._edges_path[i]
-                    if side_door_crossing and edge.is_crossing_door and self.check_edge(edge, pt[0], self._nodes_path[i+1][0]):
-                        print("Executing GoThroughDoor strategy to reach node : {}".format(self._nodes_path[i+1]))
-                        crossing_result = self.gtd_strategy.goto(self._current_pose.pose, self._nodes_path[i+1][1])
-
+        # If there's a node name, we reach it directly if it exists
+        if goal_node != "":
+            print("Navigation goal : node {}".format(goal_node))
+            node_obj = self._get_node_service(goal_node).node
+            if node_obj.name == "":
+                rospy.logerr("Node of name {} doesn't exist, cancelling navigation".format(goal_node))
+                self._actionServer.set_aborted()
+                return
             self._current_pose = self.get_current_pose()
+            result = navigationStrategy.goto(self._current_pose, node_obj.pose)
+        else:
+            # If the strategy uses Interactive markers
+            if is_itm_strategy:
+                self.create_path(goal_pose, planning_mode)
+                self.reconfigure_param('yaw_goal_tolerance', 3.5)
 
-        # Now we reach the goal :
-        result = navigationStrategy.goto(self._current_pose, goal_pose)
+                # Call the navigation strategy to reach all nodes
+                navigationStrategy.startTimeWatch()
+                for i in range(len(self._nodes_path)):
+                    pt = self._nodes_path[i]
+                    result = navigationStrategy.goto(self._current_pose, pt[1])
+                    if not result:
+                        self.update_graph("blocked", pt[0])
+                        self._modify_node_service(pt[0], "color", "RED")
+                    else:
+                        self.update_graph("free", pt[0])
+                        self._modify_node_service(pt[0], "color", "GREEN")
+                        if pt != self._nodes_path[-1]:
+                            # Check if the edge to the next node is crossing a door :
+                            edge = self._edges_path[i]
+                            if side_door_crossing and edge.is_crossing_door and self.check_edge(edge, pt[0], self._nodes_path[i+1][0]):
+                                print("Executing GoThroughDoor strategy to reach node : {}".format(self._nodes_path[i+1]))
+                                crossing_result = self.gtd_strategy.goto(self._current_pose.pose, self._nodes_path[i+1][1])
+
+                    self._current_pose = self.get_current_pose()
+
+                # Now we reach the goal :
+                result = navigationStrategy.goto(self._current_pose, goal_pose)
+
+            # If the strategy doesn't use Interactive markers
+            else:
+                result = navigationStrategy.goto(None, goal_pose)
 
         # Step 3: Send result to the general Manager
         resultId=4  # Failure
@@ -359,7 +371,7 @@ class Nm:
         #current_navigationStrategy=self._navigationStrategyMaps["CleanAndRetry"]  
         current_navigationStrategy=self._navigationStrategyMaps["ItMCR"]
 
-        self.navigateToGoal(self._current_message_id, self._current_message_action, current_navigationStrategy, "euclidian", False, _current_node.pose)
+        self.navigateToGoal(self._current_message_id, self._current_message_action, current_navigationStrategy, False, "euclidian", False, "", _current_node.pose)
 
     def gotoAction(self,data):
         # navigate to point
