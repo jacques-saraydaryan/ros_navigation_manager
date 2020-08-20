@@ -50,7 +50,7 @@ class GoThroughDoor(AbstractNavStrategy):
         self.obstacle_detected = False
         self.obstacle_detected_time = 0.0
         self.obstacle_distance = 100000.0
-        self.max_wait_time = 10.0
+        self.max_wait_time = 5.0
 
         self.start_time = 0.0
         self.stop = False

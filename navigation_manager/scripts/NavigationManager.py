@@ -272,7 +272,7 @@ class Nm:
 
     def update_graph(self, action, node):
         if action == "blocked":
-            self._update_graph_service("", node, 30.0)
+            self._update_graph_service("", node, 100.0)
         elif action == "free":
             self._update_graph_service("", node, 1.0)
         elif action == "reset":
