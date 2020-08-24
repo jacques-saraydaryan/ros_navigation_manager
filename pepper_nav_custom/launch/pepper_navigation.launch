@@ -1,6 +1,7 @@
 <launch>
   
-  <arg name="map_file" default="$(find pepper_nav_custom)/maps/humanoo_map.yaml"/>
+  <arg name="map_file" default="$(find pepper_nav_custom)/maps/citi/etage_2_v2.yaml"/>
+  <param name="map_file" value="$(arg map_file)"/>
   <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
   
   <!-- start 3d information used by worldmanagement and navigation for 3d costmap update -->
@@ -9,11 +10,11 @@
   <!-- convert depth img to pcl for naivgation and costmap on /points -->
   <!--<include file="$(find pepper_nav_custom)/launch/depth_pcl_points.launch"/> -->
 
- <arg name="scan_topic" default=""/>
- <arg name="pcl_topic" default=""/>
+ <arg name="scan_topic" default="/scan"/>
+ <arg name="pcl_topic" default="/pcl"/>
  <remap from="scan" to="$(arg scan_topic)"/>
  <remap from="pcl" to="$(arg pcl_topic)"/>
-<remap from="odom" to="/pepper_robot/odom"/>
+ <remap from="odom" to="/pepper_robot/odom"/>
   <!-- THEIR AMCL -->
 <!--   <arg name="custom_amcl_launch_file" default="$(find pepper_nav_custom)/launch/includes/ext/asus_xtion_pro_amcl.launch.xml"/>
   <arg name="initial_pose_x" default="0.0"/> 
@@ -60,11 +61,10 @@
 
    
 
-  <!-- Rviz 
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find pal_pepper
-          )/config/pepper.rviz" />
-
-          -->
+  <!-- Rviz
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find pepper_robot)/pepper_bringup/config/pepper.rviz" />
+  -->
+          
 
 </launch>
 

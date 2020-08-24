@@ -4,7 +4,8 @@ project(pepper_pose_for_nav)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS rospy sensor_msgs std_msgs tf dynamic_reconfigure)
+find_package(catkin REQUIRED COMPONENTS rospy sensor_msgs std_msgs tf dynamic_reconfigure message_generation
+)
 
 
  #Generate services in the 'srv' folder

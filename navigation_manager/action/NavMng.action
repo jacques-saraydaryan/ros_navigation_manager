@@ -1,8 +1,11 @@
 #goal definition
 string action
-string itP
 string navstrategy
-geometry_msgs/Point itP_point
+bool use_inter_markers
+string make_plan_mode
+bool side_door_crossing
+string node
+geometry_msgs/Pose goal_pose
 
 ---
 #result definition

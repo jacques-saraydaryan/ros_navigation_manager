@@ -1,54 +1,65 @@
 __author__ = 'Jacques Saraydaryan'
-from abc import ABCMeta, abstractmethod
-import random
+
 import rospy
+from abc import abstractmethod
 from threading import Timer
+from move_base_msgs.msg import MoveBaseGoal
+
 
 class AbstractNavStrategy:
-    _retry_max_nb = 3
-    _maxTimeElapsed = 60*10 # in second
-    _timeout_checker=False
     _actMove_base=''
-    _maxWaitTimePerGoal=60*2
     _retry_nb=0
+    _retry_max_nb = 3
+    _maxWaitTimePerGoal=60*1
+    _maxTimeElapsed = 60*10  # in second
+    _timeout_checker=False
     _t_timer=''
+    current_goal = MoveBaseGoal()
 
     def __init__(self,actMove_base):
         self._actMove_base=actMove_base
-        pass
-
 
     @abstractmethod
-    def goto(self, sourcePose, targetPose): pass
+    def goto(self, current_pose, target_pose): pass
 
     @abstractmethod
     def stopAll(self): pass
 
     def startTimeWatch(self):
-        timeout=self._maxTimeElapsed
         self.startTimeWatchWithTimeOut(self._maxTimeElapsed)
 
-    def startTimeWatchWithTimeOut(self,tOut):
-        timeout=tOut
-        self._t_timer = Timer(timeout, self._timeout_checker)
+    def startTimeWatchWithTimeOut(self, tOut):
+        self._t_timer = Timer(tOut, self.timeout_reached)
         self._t_timer.start()
-    
+
+    def timeout_reached(self):
+        self._timeout_checker = True
+
     def reset(self):
-        self._retry_nb=0
-        self._timeout_checker=False
+        self._retry_nb = 0
+        self._timeout_checker = False
         try:
             self._t_timer.cancel()
         except Exception as e:
             rospy.loginfo("Unable to reset timer: %s" % e)
 
-    def setMaxNbRetry(self,maxNbRetry):
-        self._retry_max_nb=maxNbRetry
+    def setMaxNbRetry(self, maxNbRetry):
+        self._retry_max_nb = maxNbRetry
 
-    def setMaxTimeElapsed(self,maxElapsedTime):
-        self._maxTimeElapsed=maxElapsedTime
+    def setMaxTimeElapsed(self, maxElapsedTime):
+        self._maxTimeElapsed = maxElapsedTime
 
-    def setMaxTimeElapsedPerGoal(self,maxElapsedTimePerGoal):
-        self._maxWaitTimePerGoal=maxElapsedTimePerGoal
+    def setMaxTimeElapsedPerGoal(self, maxElapsedTimePerGoal):
+        self._maxWaitTimePerGoal = maxElapsedTimePerGoal
 
+    def set_timeout_checker(self, value):
+        self._timeout_checker = value
 
-
+    def set_current_goal(self, goal):
+        """
+        Update the current_goal with the geometry_msgs/Pose goal in parameter
+        """
+        self.current_goal.target_pose.header.frame_id = "map"
+        self.current_goal.target_pose.header.stamp = rospy.Time.now()
+        self.current_goal.target_pose.pose.position = goal.position
+        self.current_goal.target_pose.pose.orientation = goal.orientation

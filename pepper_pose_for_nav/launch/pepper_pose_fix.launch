@@ -7,7 +7,6 @@
   <arg name="isActivatedExtColl" default="False" />
   <arg name="isActivatedAutoDiagReflex" default="False" />
 
-
   <node pkg="pepper_pose_for_nav" type="MoveHeadPosition.py" name="fix_head_position" required="false" output="screen">
     <param name="ip" value="$(arg nao_ip)"/>
     <param name="port" value="$(arg nao_port)"/>
@@ -18,7 +17,6 @@
     <param name="port" value="$(arg nao_port)"/>
   </node>
 
-
   <node pkg="pepper_pose_for_nav" type="DisableExternalCollision.py" name="DisableExternalCollision" required="false" output="screen">
     <param name="ip" value="$(arg nao_ip)"/>
     <param name="port" value="$(arg nao_port)"/>
@@ -26,6 +24,4 @@
     <param name="isActivatedAutoDiagReflex" value="$(arg isActivatedAutoDiagReflex)"/>
   </node>
 
-  
-  
 </launch>
