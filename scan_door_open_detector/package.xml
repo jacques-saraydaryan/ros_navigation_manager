@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>pepper_door_open_detector</name>
+  <name>scan_door_open_detector</name>
   <version>1.0.0</version>
   <description>Openning Door detection for pepper robocup start</description>
 

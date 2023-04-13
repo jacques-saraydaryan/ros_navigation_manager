@@ -1,0 +1,9 @@
+
+<launch>
+  <arg name="scan_topic" default=""/>
+    <node pkg="scan_door_open_detector" type="OpeningDoorDetector.py" name="scan_door_open_detector" required="false" output="screen">
+      <param name="min_distance" value="0.8"/>
+      <remap from="/scan_topic" to="$(arg scan_topic)"/>
+    </node>
+
+</launch>

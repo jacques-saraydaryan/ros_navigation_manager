@@ -97,20 +97,21 @@ class GoToPositionActionClient():
                 break
             elif(answer == 1): #Entrance
                 # Pose.header.frame_id = 'map'
-                pointGoal.x = -3.09927248955
-                pointGoal.y = 0.147106766701
+                # ROB I102 ROOM
+                pointGoal.x = -11.9
+                pointGoal.y = -2.25
                 # Pose.pose.orientation.z = 0.965981851705
                 # Pose.pose.orientation.w = 0.25860986481
             elif (answer == 2): #kitchen
                 # Pose.header.frame_id = 'map'
-                pointGoal.x = -3.16048765182
-                pointGoal.y = 2.15104579926
+                pointGoal.x = -11.8
+                pointGoal.y = 2.45
                 # Pose.pose.orientation.z = 0.978578773184
                 # Pose.pose.orientation.w = 0.205872739024
             elif(answer == 3): #charging place
                 # Pose.header.frame_id = 'map'
-                pointGoal.x = -0.257431030273
-                pointGoal.y = -1.1128064394
+                pointGoal.x = -1.68
+                pointGoal.y = 0.314
                 # Pose.pose.orientation.z = 0.581594191623
                 # Pose.pose.orientation.w = 0.731730386103
             else:

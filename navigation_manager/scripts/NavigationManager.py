@@ -80,7 +80,7 @@ class Nm:
         self._getPoint_service = rospy.ServiceProxy('get_InterestPoint', getitP_service)
 
         # Subscribe to the move_base action server
-        self._actMove_base = actionlib.SimpleActionClient("move_base", MoveBaseAction)
+        self._actMove_base = actionlib.SimpleActionClient("/move_base", MoveBaseAction)
         rospy.loginfo("Waiting for move_base action server...")
 
         #FIXME What happen if action server is not available ?

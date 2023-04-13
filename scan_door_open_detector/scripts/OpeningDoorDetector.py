@@ -1,7 +1,4 @@
 #!/usr/bin/env python  
-import qi
-import sys
-import time
 import numpy as np
 import rospy
 from sensor_msgs.msg import LaserScan
@@ -20,14 +17,13 @@ class MinFrontValueDetector():
 		self.configure()
 
 	def configure(self):
-		rospy.init_node('pepper_open_door_detector')
+		rospy.init_node('scan_open_door_detector')
 		self.min_distance=rospy.get_param('min_distance',0.8)
 		rospy.logdebug("Param: min_distance:"+str(self.min_distance))
 
 		#declare ros service 
 		self.minFrontValueSrv = rospy.Service('min_front_value_srv', MinFrontValue, self.minFrontValueSrvCallback)
-
-   		self.publisher=rospy.Publisher("/start", String, queue_size=1)
+		self.publisher=rospy.Publisher("/start", String, queue_size=1)
 		rospy.Subscriber('/laser', LaserScan, self.laserCallback, queue_size=1)
 		rospy.spin()
 
@@ -47,9 +43,9 @@ class MinFrontValueDetector():
 			if minValue_tmp > data.ranges[center_index-i]:
 				minIndex_tmp=center_index+i
 				minValue_tmp=data.ranges[center_index-i]
-		rospy.loginfo( "min distance:"+str(minValue_tmp)+", index laser:"+str(minIndex_tmp))
+		#rospy.loginfo( "min distance:"+str(minValue_tmp)+", index laser:"+str(minIndex_tmp))
 		self.minValue=minValue_tmp
-		rospy.logdebug( "min distance global:"+str(self.minValue))
+		#rospy.logdebug( "min distance global:"+str(self.minValue))
 		self.minIndex=minIndex_tmp
 
 		if self.minValue > self.min_distance:
@@ -57,6 +53,7 @@ class MinFrontValueDetector():
 
 	def minFrontValueSrvCallback(self,req):
 			result=self.minValue
+			rospy.loginfo("[scan_open_door_detector] Service Call : min distance measure:"+str(self.minValue))
 			return {'value':result}
 
 if __name__=="__main__":
